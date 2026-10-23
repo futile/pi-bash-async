@@ -1,3 +1,23 @@
+**A single pi-extension "fork"** of [Jonghakseo/pi-extension](https://github.com/Jonghakseo/pi-extension):
+only its [`packages/bash-async`](https://github.com/Jonghakseo/pi-extension/tree/main/packages/bash-async)
+extension, plus these changes:
+- Running jobs survive `/reload` and are adopted by the reloaded extension.
+- The footer shows `⏳N` while N jobs run, and the job list is announced on `pi.events`
+  (`pi.bash-async.v1:jobs`) for other extensions.
+- Call rows and the running-jobs widget show the command; a missing title defaults to the command.
+
+Install this version instead of the npm package mentioned below:
+
+```bash
+pi install git:github.com/futile/pi-bash-async
+```
+
+Branches: `upstream` is the full upstream monorepo plus the changes. `main` (default) is generated
+from it with `git subtree split`. On `upstream`, `packages/bash-async/scripts/sync-upstream [--push]`
+merges upstream `main` and regenerates `main`; `scripts/update-main [--push]` only regenerates `main`.
+
+---
+
 # bash-async
 
 ![bash-async: Runs long shell commands in the background and reports when they finish.](./cover.svg)
@@ -15,7 +35,6 @@ Do not load this package alongside another extension that registers `bash_async`
 ## Tool interface
 
 The extension registers the `bash_async` tool with five actions:
-
 - `start`: launch a finite command in the background
 - `status`: inspect one job
 - `output`: read retained job output
