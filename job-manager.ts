@@ -11,6 +11,7 @@ import {
 import type { AsyncTaskProvider } from "./async-task-provider.js";
 import { JobLog } from "./job-log.js";
 import type { CompletedJob, NotificationBatcher } from "./notification-batcher.js";
+import { defaultJobTitle } from "./running-jobs-widget.js";
 import { validateCwd } from "./tool-schema.js";
 import {
 	type BashAsyncJob,
@@ -171,7 +172,7 @@ function tailWithinBytes(lines: string[], maxBytes: number): { lines: string[]; 
 
 function titleFor(command: string, provided?: string): string {
 	if (provided?.trim()) return provided;
-	return command.trim().split(/\s+/)[0] || "bash job";
+	return defaultJobTitle(command);
 }
 
 function safeSessionId(value: string | undefined): string {

@@ -40,7 +40,10 @@ describe("running bash_async jobs widget", () => {
 			now: () => 6_000,
 		});
 
-		expect(widget.render(80)).toEqual(["bash_async · First · 5s", "bash_async · Second · 4s"]);
+		expect(widget.render(80)).toEqual([
+			"bash_async · First · $ pnpm test · 5s",
+			"bash_async · Second · $ pnpm test · 4s",
+		]);
 		widget.dispose();
 	});
 

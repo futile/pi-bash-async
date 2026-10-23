@@ -4,6 +4,7 @@ import type { BashAsyncJob } from "./types.js";
 
 const MAX_TITLE_WIDTH = 80;
 const WIDGET_LABEL = "bash_async";
+const MIN_COMMAND_WIDTH = 12;
 // biome-ignore lint/suspicious/noControlCharactersInRegex: Strip ANSI control sequences from user-provided titles.
 const ANSI_ESCAPE_SEQUENCE = /\x1B\[[0-?]*[ -/]*[@-~]/g;
 
@@ -21,6 +22,14 @@ export function sanitizeTitle(title: string): string {
 		.join("")
 		.replace(/\s+/g, " ")
 		.trim();
+}
+
+// Local patch: the default title is the whole command on one line, not just its first word ("cd").
+const DEFAULT_TITLE_LENGTH = 60;
+export function defaultJobTitle(command: string): string {
+	const clean = sanitizeTitle(command);
+	if (!clean) return "bash job";
+	return clean.length > DEFAULT_TITLE_LENGTH ? `${clean.slice(0, DEFAULT_TITLE_LENGTH - 3)}...` : clean;
 }
 
 export function formatElapsed(milliseconds: number): string {
@@ -80,10 +89,16 @@ export class RunningJobsWidget implements Component {
 			Math.min(MAX_TITLE_WIDTH, availableTitleWidth),
 			"...",
 		);
+		// The command takes whatever width is left; a default title already is the command.
+		const commandPrefix = " · $ ";
+		const commandWidth = availableTitleWidth - visibleWidth(title) - visibleWidth(commandPrefix);
+		const showCommand = job.title !== defaultJobTitle(job.command) && commandWidth >= MIN_COMMAND_WIDTH;
+		const command = showCommand ? truncateToWidth(sanitizeTitle(job.command), commandWidth, "...") : "";
 		const line =
 			this.theme.fg("accent", WIDGET_LABEL) +
 			this.theme.fg("muted", " · ") +
 			this.theme.fg("text", title) +
+			(command ? this.theme.fg("muted", commandPrefix + command) : "") +
 			this.theme.fg("muted", suffix);
 		return truncateToWidth(line, width, this.theme.fg("muted", "..."));
 	}
