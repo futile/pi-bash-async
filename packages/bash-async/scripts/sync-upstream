@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Merge Jonghakseo/pi-extension `main` into the `upstream` branch, then regenerate `main`.
+# Usage: scripts/sync-upstream [--push]   (run from a clean checkout of `upstream`)
+set -euo pipefail
+
+remote=jonghakseo
+url=https://github.com/Jonghakseo/pi-extension.git
+
+[ "$(git branch --show-current)" = upstream ] || { echo "check out the 'upstream' branch first" >&2; exit 1; }
+git diff --quiet HEAD || { echo "working tree has uncommitted changes" >&2; exit 1; }
+
+git remote get-url "$remote" >/dev/null 2>&1 || git remote add "$remote" "$url"
+git fetch "$remote" main
+# Merge, not rebase: rewriting our commits would make `main` a non-fast-forward.
+git merge --no-edit "$remote/main"
+
+exec "$(dirname "$0")/update-main" "$@"
