@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Regenerate `main` (packages/bash-async at the repo root) from the `upstream` branch.
+# Usage: scripts/update-main [--push]   (run from a checkout of `upstream`)
+set -euo pipefail
+
+[ "$(git branch --show-current)" = upstream ] || { echo "check out the 'upstream' branch first" >&2; exit 1; }
+
+split=$(git subtree split --prefix=packages/bash-async upstream)
+if old=$(git rev-parse -q --verify refs/heads/main); then
+  # Deterministic split: merging upstream keeps this a fast-forward; rewriting `upstream` does not.
+  git merge-base --is-ancestor "$old" "$split" ||
+    { echo "new main $split does not fast-forward from $old (was 'upstream' rewritten?)" >&2; exit 1; }
+fi
+git update-ref refs/heads/main "$split"
+echo "main -> $split"
+
+if [ "${1:-}" = --push ]; then git push origin main upstream; fi
