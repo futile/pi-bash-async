@@ -275,8 +275,8 @@ describe("bash_async extension registration", () => {
 		);
 		expect(tui.requestRender).toHaveBeenCalled();
 		expect(widget.render(100)).toEqual([
-			expect.stringMatching(/^bash_async · First job · \d+s$/),
-			expect.stringMatching(/^bash_async · Second job · \d+s$/),
+			expect.stringMatching(/^bash_async · First job · \$ sleep 30 · \d+s$/),
+			expect.stringMatching(/^bash_async · Second job · \$ sleep 30 · \d+s$/),
 		]);
 
 		await tool.execute(

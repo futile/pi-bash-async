@@ -292,11 +292,13 @@ export default function bashAsync(host: ExtensionAPI): void {
 			"Repeated status, output, or list queries that return no new information are rate limited and fail with an error.",
 			"bash_async does not support TUI, REPL, stdin, or interactive terminal programs.",
 		],
-		renderCall(args) {
+		renderCall(args, _theme, context) {
 			const input = args as BashAsyncParams;
 			return renderCallText(
 				typeof input.action === "string" ? input.action : "invalid",
 				typeof input.title === "string" ? input.title : undefined,
+				input.action === "start" && typeof input.command === "string" ? input.command : undefined,
+				context?.expanded ?? false,
 			);
 		},
 		renderResult(result, { expanded }, theme) {

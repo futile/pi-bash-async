@@ -34,8 +34,16 @@ export function renderJobList(jobs: BashAsyncJob[]): string {
 	return jobs.map((job) => `${job.id} ${job.status} ${job.title}`).join("\n");
 }
 
-export function renderCallText(action: string, title?: string): Component {
-	return new Text(title ? `bash_async ${action}: ${title}` : `bash_async ${action}`, 0, 0);
+// Local patch: show the command under the call row; collapsed, only its first source lines (long lines still wrap).
+const COLLAPSED_COMMAND_LINES = 3;
+export function renderCallText(action: string, title?: string, command?: string, expanded = false): Component {
+	const head = title ? `bash_async ${action}: ${title}` : `bash_async ${action}`;
+	const lines = command?.trim() ? command.trim().split("\n") : [];
+	if (lines.length === 0) return new Text(head, 0, 0);
+	const shown = expanded ? lines : lines.slice(0, COLLAPSED_COMMAND_LINES);
+	const more = lines.length - shown.length;
+	const body = `$ ${shown.join("\n")}${more > 0 ? `\n… (${more} more lines)` : ""}`;
+	return new Text(`${head}\n${body}`, 0, 0);
 }
 
 export interface ToolResultLike {
