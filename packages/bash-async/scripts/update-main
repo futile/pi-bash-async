@@ -5,7 +5,7 @@ set -euo pipefail
 
 [ "$(git branch --show-current)" = upstream ] || { echo "check out the 'upstream' branch first" >&2; exit 1; }
 
-split=$(git subtree split --prefix=packages/bash-async upstream)
+split=$(git subtree split -q --prefix=packages/bash-async upstream)
 if old=$(git rev-parse -q --verify refs/heads/main); then
   # Deterministic split: merging upstream keeps this a fast-forward; rewriting `upstream` does not.
   git merge-base --is-ancestor "$old" "$split" ||
