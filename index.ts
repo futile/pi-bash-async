@@ -145,6 +145,9 @@ export default function bashAsync(host: ExtensionAPI): void {
 	const windowMs = syncWindowMs();
 	let manager: JobManager;
 	const pollGuard = new PollGuard();
+	// Context of a session with a UI host (ctx.hasUI): the interactive TUI, or a headless host such as
+	// RPC mode or a subagent host that shows the footer status elsewhere. The widget stays TUI-only
+	// (syncRunningJobsWidget); the footer status reaches every UI host.
 	let uiContext: ExtensionContext | undefined;
 	let runningJobsWidget: RunningJobsWidget | undefined;
 	let widgetInstalled = false;
@@ -251,7 +254,7 @@ export default function bashAsync(host: ExtensionAPI): void {
 			provider.shutdown();
 			({ manager, notifications, provider, jobSessions, live } = adopted);
 			bindLive();
-			if (context.mode === "tui") uiContext = context;
+			if (context.hasUI) uiContext = context;
 			for (const [message, options] of live.backlog.splice(0)) live.send?.(message, options);
 			notifications.flush();
 			live.sync?.();
@@ -306,11 +309,9 @@ export default function bashAsync(host: ExtensionAPI): void {
 			return new Text(text ? theme.fg("toolOutput", text) : "", 0, 0);
 		},
 		async execute(_toolCallId, args, signal, _onUpdate, context) {
-			if (context.mode === "tui") uiContext = context;
-			else {
-				clearRunningJobsWidget();
-				uiContext = undefined;
-			}
+			// Clear through the previous context before replacing it: only a TUI context shows the widget.
+			if (context.mode !== "tui") clearRunningJobsWidget();
+			uiContext = context.hasUI ? context : undefined;
 			const sessionId = context.sessionManager.getSessionId();
 			const outcome = await execute(
 				manager,

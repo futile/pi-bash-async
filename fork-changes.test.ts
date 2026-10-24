@@ -24,13 +24,14 @@ async function load(): Promise<IndexModule> {
 	return import("./index.js");
 }
 
-function instance(mod: IndexModule, mode: "tui" | "print") {
+function instance(mod: IndexModule, mode: "tui" | "rpc" | "print") {
 	const handlers = new Map<string, ((event: unknown, ctx: unknown) => unknown)[]>();
 	const tools = new Map<string, any>();
 	const listeners = new Map<string, () => void>();
 	const sent: any[] = [];
 	const emitted: any[] = [];
 	const statuses: [string, string | undefined][] = [];
+	const widgets: string[] = [];
 	mod.default({
 		on: (name: string, fn: any) => handlers.set(name, [...(handlers.get(name) ?? []), fn]),
 		registerTool: (tool: any) => tools.set(tool.name, tool),
@@ -47,11 +48,14 @@ function instance(mod: IndexModule, mode: "tui" | "print") {
 	} as any);
 	const ctx = {
 		mode,
-		hasUI: mode === "tui",
+		hasUI: mode !== "print",
 		cwd: process.cwd(),
 		sessionManager: { getSessionId: () => "session-1", getSessionFile: () => undefined },
 		isIdle: () => true,
-		ui: { setWidget() {}, setStatus: (key: string, text?: string) => statuses.push([key, text]) },
+		ui: {
+			setWidget: (key: string) => widgets.push(key),
+			setStatus: (key: string, text?: string) => statuses.push([key, text]),
+		},
 	};
 	const emit = async (name: string, event: unknown = {}) => {
 		for (const fn of handlers.get(name) ?? []) await fn(event, ctx);
@@ -59,7 +63,7 @@ function instance(mod: IndexModule, mode: "tui" | "print") {
 	const start = (command: string, title?: string) =>
 		tools.get("bash_async").execute("call", { action: "start", command, title }, undefined, undefined, ctx);
 	const completions = () => sent.filter((message) => message.customType === "bash-async-completion");
-	return { sent, emitted, statuses, listeners, emit, start, completions };
+	return { sent, emitted, statuses, widgets, listeners, emit, start, completions };
 }
 
 describe("/reload hand-over", () => {
@@ -130,6 +134,16 @@ describe("jobs signal", () => {
 		expect(pi.statuses).toHaveLength(0);
 		await pi.emit("session_shutdown", { reason: "quit" });
 		expect(pi.emitted.at(-1).running).toBe(0);
+	});
+
+	it("mirrors the count to the status of a headless UI host, without the TUI widget", async () => {
+		const pi = instance(await load(), "rpc");
+		await pi.emit("session_start");
+		await pi.start("sleep 0.2", "t");
+		await vi.waitFor(() => expect(pi.statuses).toContainEqual(["bash-async", "⏳1"]));
+		await vi.waitFor(() => expect(pi.statuses.at(-1)).toEqual(["bash-async", undefined]), { timeout: 5000 });
+		expect(pi.widgets).toHaveLength(0);
+		await pi.emit("session_shutdown", { reason: "quit" });
 	});
 
 	it("lets the adopting instance announce a handed-over job after /reload", async () => {
