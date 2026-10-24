@@ -24,7 +24,9 @@ async function load(): Promise<IndexModule> {
 	return import("./index.js");
 }
 
-function instance(mod: IndexModule, mode: "tui" | "rpc" | "print") {
+// With a bus, the first start waits up to 2 s for an async-task host the stand-in never provides
+// (AsyncTaskProvider discovery), so only the tests that inspect the bus get one.
+function instance(mod: IndexModule, mode: "tui" | "rpc" | "print", { bus = true } = {}) {
 	const handlers = new Map<string, ((event: unknown, ctx: unknown) => unknown)[]>();
 	const tools = new Map<string, any>();
 	const listeners = new Map<string, () => void>();
@@ -36,15 +38,17 @@ function instance(mod: IndexModule, mode: "tui" | "rpc" | "print") {
 		on: (name: string, fn: any) => handlers.set(name, [...(handlers.get(name) ?? []), fn]),
 		registerTool: (tool: any) => tools.set(tool.name, tool),
 		sendMessage: (message: any) => sent.push(message),
-		events: {
-			on: (channel: string, fn: () => void) => {
-				listeners.set(channel, fn);
-				return () => listeners.delete(channel);
-			},
-			emit: (channel: string, data: unknown) => {
-				if (channel === mod.JOBS_EVENT) emitted.push(data);
-			},
-		},
+		events: bus
+			? {
+					on: (channel: string, fn: () => void) => {
+						listeners.set(channel, fn);
+						return () => listeners.delete(channel);
+					},
+					emit: (channel: string, data: unknown) => {
+						if (channel === mod.JOBS_EVENT) emitted.push(data);
+					},
+				}
+			: undefined,
 	} as any);
 	const ctx = {
 		mode,
@@ -68,13 +72,13 @@ function instance(mod: IndexModule, mode: "tui" | "rpc" | "print") {
 
 describe("/reload hand-over", () => {
 	it("hands a running job to the next instance, which delivers its completion", async () => {
-		const old = instance(await load(), "print");
+		const old = instance(await load(), "print", { bus: false });
 		await old.emit("session_start");
 		const started = await old.start("sleep 0.5; echo survived-reload");
 		expect(started.details.status).toBe("running");
 		await old.emit("session_shutdown", { reason: "reload" });
 
-		const next = instance(await load(), "print");
+		const next = instance(await load(), "print", { bus: false });
 		await next.emit("session_start");
 		await vi.waitFor(() => expect(next.completions()).toHaveLength(1), { timeout: 5000 });
 		expect(next.completions()[0].content).toMatch(/survived-reload/);
@@ -86,7 +90,7 @@ describe("/reload hand-over", () => {
 		const directory = await mkdtemp(join(tmpdir(), "bash-async-fork-"));
 		directories.push(directory);
 		const marker = join(directory, "marker");
-		const pi = instance(await load(), "print");
+		const pi = instance(await load(), "print", { bus: false });
 		await pi.emit("session_start");
 		await pi.start(`sleep 0.5; touch ${marker}`);
 		await pi.emit("session_shutdown", { reason: "quit" });
@@ -96,7 +100,7 @@ describe("/reload hand-over", () => {
 	});
 });
 
-describe("jobs signal", () => {
+describe("jobs signal", { timeout: 15_000 }, () => {
 	it("shows the glyph with the job count", async () => {
 		const { jobsIndicator } = await load();
 		expect(jobsIndicator(1)).toBe("⏳1");
@@ -173,7 +177,7 @@ describe("command display", () => {
 	});
 
 	it("uses the command as the title when start has none", async () => {
-		const pi = instance(await load(), "print");
+		const pi = instance(await load(), "print", { bus: false });
 		const result = await pi.start("cd / && true");
 		expect(result.details.title).toBe("cd / && true");
 		await pi.emit("session_shutdown", { reason: "quit" });
