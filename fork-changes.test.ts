@@ -130,25 +130,20 @@ describe("jobs signal", { timeout: 15_000 }, () => {
 		expect(pi.listeners.has(mod.JOBS_REQUEST_EVENT)).toBe(false);
 	});
 
-	it("announces on the bus without touching the UI in headless sessions", async () => {
-		const pi = instance(await load(), "print");
-		await pi.emit("session_start");
-		await pi.start("sleep 0.2", "t");
-		await vi.waitFor(() => expect(pi.emitted.some((update) => update.running === 1)).toBe(true));
-		expect(pi.statuses).toHaveLength(0);
-		await pi.emit("session_shutdown", { reason: "quit" });
-		expect(pi.emitted.at(-1).running).toBe(0);
-	});
-
-	it("mirrors the count to the status of a headless UI host, without the TUI widget", async () => {
-		const pi = instance(await load(), "rpc");
-		await pi.emit("session_start");
-		await pi.start("sleep 0.2", "t");
-		await vi.waitFor(() => expect(pi.statuses).toContainEqual(["bash-async", "⏳1"]));
-		await vi.waitFor(() => expect(pi.statuses.at(-1)).toEqual(["bash-async", undefined]), { timeout: 5000 });
-		expect(pi.widgets).toHaveLength(0);
-		await pi.emit("session_shutdown", { reason: "quit" });
-	});
+	it.each(["print", "rpc"] as const)(
+		"mirrors the count to the status of a %s host, without the TUI widget",
+		async (mode) => {
+			const pi = instance(await load(), mode);
+			await pi.emit("session_start");
+			await pi.start("sleep 0.2", "t");
+			await vi.waitFor(() => expect(pi.emitted.some((update) => update.running === 1)).toBe(true));
+			expect(pi.statuses).toContainEqual(["bash-async", "⏳1"]);
+			await pi.emit("session_shutdown", { reason: "quit" });
+			expect(pi.emitted.at(-1).running).toBe(0);
+			expect(pi.statuses.at(-1)).toEqual(["bash-async", undefined]);
+			expect(pi.widgets).toHaveLength(0);
+		},
+	);
 
 	it("lets the adopting instance announce a handed-over job after /reload", async () => {
 		const old = instance(await load(), "tui");
